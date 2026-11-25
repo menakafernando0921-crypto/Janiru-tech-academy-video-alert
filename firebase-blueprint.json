@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "Message": {
+      "title": "ChannelMessage",
+      "description": "A broadcast alert message posted or scheduled by the channel admin.",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Message body text with optional URLs.",
+          "maxLength": 4000
+        },
+        "imageData": {
+          "type": "string",
+          "description": "Optional compressed JPEG base64 data URI for attached thumbnail or screenshot.",
+          "maxLength": 450000
+        },
+        "publishAt": {
+          "type": "number",
+          "description": "Epoch milliseconds when the message becomes visible to subscribers."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the message was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the message was last updated."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of the admin who created the message.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "likesCount": {
+          "type": "number",
+          "description": "Total thumbs-up reaction count."
+        },
+        "heartsCount": {
+          "type": "number",
+          "description": "Total heart reaction count."
+        }
+      },
+      "required": [
+        "text",
+        "publishAt",
+        "createdAt",
+        "updatedAt",
+        "authorId",
+        "likesCount",
+        "heartsCount"
+      ]
+    },
+    "Reaction": {
+      "title": "MessageReaction",
+      "description": "Tracks a single verified user's reaction (likes or hearts) on a message.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the reacting user.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "enum": ["likes", "hearts"],
+          "description": "Reaction type."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when reaction was added."
+        }
+      },
+      "required": ["userId", "type", "createdAt"]
+    },
+    "ChannelMeta": {
+      "title": "ChannelMeta",
+      "description": "Channel header metadata and aggregate follower count.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name of the broadcast channel.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Channel tagline or alert category.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "baseFollowers": {
+          "type": "number",
+          "description": "Baseline follower count."
+        },
+        "followersCount": {
+          "type": "number",
+          "description": "Dynamic subscriber follow count from verified followers."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last update."
+        }
+      },
+      "required": ["name", "subtitle", "baseFollowers", "followersCount", "updatedAt"]
+    },
+    "Follower": {
+      "title": "ChannelFollower",
+      "description": "Tracks a verified user following the channel.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the follower.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user followed."
+        }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "Admin": {
+      "title": "ChannelAdmin",
+      "description": "Explicitly authorized admin user document.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Broadcast and scheduled video alert messages."
+    },
+    "/messages/{messageId}/reactions/{reactionId}": {
+      "schema": { "$ref": "#/entities/Reaction" },
+      "description": "Per-user reaction records preventing duplicate reactions."
+    },
+    "/channel/meta": {
+      "schema": { "$ref": "#/entities/ChannelMeta" },
+      "description": "Singleton document storing channel metadata and follower count."
+    },
+    "/channel/meta/followers/{userId}": {
+      "schema": { "$ref": "#/entities/Follower" },
+      "description": "Per-user follow record for the channel."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Authorized channel administrators."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Janiru tech academy - Video Alerts",
+  "description": "Official real-time video alerts and announcements broadcast channel for Janiru tech academy.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

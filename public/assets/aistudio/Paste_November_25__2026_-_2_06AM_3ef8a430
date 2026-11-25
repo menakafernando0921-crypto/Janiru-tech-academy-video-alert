@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Janiru tech academy - Video Alerts</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #d1d7db;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            background-color: #efeae2;
+            background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+            background-blend-mode: overlay;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            background-color: #008069;
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .channel-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .channel-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #ffffff;
+            background-color: #fff;
+        }
+
+        .channel-details h1 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .verified-badge {
+            color: #25d366;
+            background: white;
+            border-radius: 50%;
+            font-size: 12px;
+            padding: 1px;
+        }
+
+        .channel-details p {
+            font-size: 12px;
+            color: #d9fdd3;
+        }
+
+        .follow-btn {
+            background-color: #ffffff;
+            color: #008069;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .follow-btn.following {
+            background-color: transparent;
+            color: #ffffff;
+            border: 1px solid #ffffff;
+        }
+
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .date-divider {
+            align-self: center;
+            background-color: #e1f3fb;
+            color: #54656f;
+            font-size: 12px;
+            padding: 5px 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+            margin: 5px 0;
+        }
+
+        .message-card {
+            background-color: #ffffff;
+            border-radius: 10px;
+            border-top-left-radius: 0;
+            padding: 8px;
+            max-width: 85%;
+            align-self: flex-start;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-image {
+            width: 100%;
+            max-height: 280px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .message-text {
+            font-size: 14.5px;
+            color: #111b21;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            padding: 2px 4px;
+        }
+
+        .message-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            padding: 0 4px;
+        }
+
+        .reactions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .reaction-btn {
+            background: #f0f2f5;
+            border: none;
+            border-radius: 12px;
+            padding: 3px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #54656f;
+        }
+
+        .reaction-btn.active {
+            background: #d9fdd3;
+            color: #008069;
+            font-weight: bold;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #667781;
+        }
+
+        /* Read-only Footer for Subscribers */
+        .readonly-footer {
+            background-color: #f0f2f5;
+            padding: 14px;
+            text-align: center;
+            color: #54656f;
+            font-size: 13px;
+            border-top: 1px solid #e9edef;
+        }
+
+        /* Admin Panel (Hidden by default) */
+        .admin-panel {
+            display: none;
+            background-color: #f0f2f5;
+            padding: 12px;
+            border-top: 2px solid #008069;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 20;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: #008069;
+        }
+
+        .admin-panel textarea {
+            width: 100%;
+            height: 70px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            resize: none;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .admin-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-label {
+            background: #ffffff;
+            border: 1px solid #ccc;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #333;
+        }
+
+        .schedule-input {
+            padding: 5px 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #fff;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .send-btn, .schedule-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .send-btn {
+            background-color: #008069;
+        }
+
+        .schedule-btn {
+            background-color: #027eb5;
+        }
+
+        .scheduled-list {
+            max-height: 90px;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 6px;
+            padding: 6px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+        }
+
+        .scheduled-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* Secret Password Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-box input {
+            width: 100%;
+            padding: 10px;
+            margin: 12px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+            text-align: center;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-btns button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-confirm { background: #008069; color: white; }
+        .btn-cancel { background: #e9edef; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Header -->
+    <div class="header">
+        <!-- Triple-click on Channel Logo/Name to trigger secret Admin Login -->
+        <div class="channel-info" id="secretTrigger" title="Channel Info">
+            <img src="chanel profile picture.jpeg" alt="Logo" class="channel-logo" id="channelLogo">
+            <div class="channel-details">
+                <h1 id="channelName">Janiru tech academy <i class="fas fa-check-circle verified-badge"></i></h1>
+                <p id="followerCount">1,240 followers</p>
+            </div>
+        </div>
+        <button class="follow-btn" id="followBtn" onclick="toggleFollow()">Follow</button>
+    </div>
+
+    <!-- Chat Messages Area -->
+    <div class="chat-area" id="chatArea">
+        <div class="date-divider">Channel Updates</div>
+    </div>
+
+    <!-- Subscriber Read-only Footer -->
+    <div class="readonly-footer" id="readonlyFooter">
+        <i class="fas fa-lock"></i> Only admins can send messages in this channel.
+    </div>
+
+    <!-- Hidden Admin Panel -->
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-header">
+            <span><i class="fas fa-shield-alt"></i> Admin Control Panel</span>
+            <button onclick="logoutAdmin()" style="background:none;border:none;color:#d93025;cursor:pointer;font-size:12px;">Close Admin</button>
+        </div>
+
+        <textarea id="msgInput" placeholder="Write video announcement here..."></textarea>
+
+        <div class="admin-controls">
+            <label class="file-label">
+                <i class="fas fa-image"></i> <span id="fileName">Add Image</span>
+                <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImageSelect(event)">
+            </label>
+
+            <input type="datetime-local" id="scheduleTime" class="schedule-input" title="Select date & time to schedule">
+        </div>
+
+        <div class="action-buttons">
+            <button class="send-btn" onclick="sendNow()"><i class="fas fa-paper-plane"></i> Send Now</button>
+            <button class="schedule-btn" onclick="scheduleMessage()"><i class="fas fa-clock"></i> Schedule</button>
+        </div>
+
+        <div id="scheduledContainer" style="display:none;">
+            <div style="font-size:11px; color:#555; margin-bottom:3px; font-weight:bold;">Scheduled Queue:</div>
+            <div class="scheduled-list" id="scheduledList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Secret Password Modal -->
+<div class="modal-overlay" id="passwordModal">
+    <div class="modal-box">
+        <h3 style="color:#008069; font-size:16px;">Admin Verification</h3>
+        <input type="password" id="adminPassInput" placeholder="Enter Password">
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-confirm" onclick="verifyAdmin()">Unlock</button>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDKs (For Real-Time Multi-Device Sync) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // =========================================================================
+    // 1. CONFIGURATION (Set your Password & Firebase Config)
+    // =========================================================================
+    
+    const ADMIN_PASSWORD = "6933173";
+    
+    // Paste your Firebase Web App config below so all users see messages in real-time:
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // =========================================================================
+    // 2. INITIALIZATION & FALLBACK STORAGE
+    // =========================================================================
+    let useFirebase = firebaseConfig.apiKey !== "YOUR_API_KEY";
+    let db;
+    if (useFirebase) {
+        const app = initializeApp(firebaseConfig);
+        db = getDatabase(app);
+    }
+
+    let selectedImageBase64 = null;
+    let isAdmin = false;
+    let clickCount = 0;
+    let clickTimer = null;
+
+    // Secret Trigger: Triple-click on the Channel Title/Logo in header
+    document.getElementById('secretTrigger').addEventListener('click', () => {
+        clickCount++;
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => { clickCount = 0; }, 600);
+        if (clickCount === 3) {
+            clickCount = 0;
+            if (!isAdmin) {
+                document.getElementById('passwordModal').style.display = 'flex';
+                document.getElementById('adminPassInput').focus();
+            }
+        }
+    });
+
+    window.closeModal = () => {
+        document.getElementById('passwordModal').style.display = 'none';
+        document.getElementById('adminPassInput').value = '';
+    };
+
+    window.verifyAdmin = () => {
+        const entered = document.getElementById('adminPassInput').value;
+        if (entered === ADMIN_PASSWORD) {
+            isAdmin = true;
+            closeModal();
+            document.getElementById('readonlyFooter').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'flex';
+            renderMessages();
+        } else {
+            alert("Incorrect Password!");
+        }
+    };
+
+    window.logoutAdmin = () => {
+        isAdmin = false;
+        document.getElementById('adminPanel').style.display = 'none';
+        document.getElementById('readonlyFooter').style.display = 'block';
+        renderMessages();
+    };
+
+    // =========================================================================
+    // 3. FOLLOW SYSTEM
+    // =========================================================================
+    let isFollowing = localStorage.getItem('channel_followed') === 'true';
+    let baseFollowers = 1240;
+
+    function updateFollowUI() {
+        const btn = document.getElementById('followBtn');
+        const countEl = document.getElementById('followerCount');
+        if (isFollowing) {
+            btn.textContent = 'Following ✓';
+            btn.classList.add('following');
+            countEl.textContent = `${(baseFollowers + 1).toLocaleString()} followers`;
+        } else {
+            btn.textContent = 'Follow';
+            btn.classList.remove('following');
+            countEl.textContent = `${baseFollowers.toLocaleString()} followers`;
+        }
+    }
+
+    window.toggleFollow = () => {
+        isFollowing = !isFollowing;
+        localStorage.setItem('channel_followed', isFollowing);
+        updateFollowUI();
+        if (isFollowing && "Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+    };
+    updateFollowUI();
+
+    // =========================================================================
+    // 4. IMAGE HANDLING
+    // =========================================================================
+    window.handleImageSelect = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        document.getElementById('fileName').textContent = file.name.substring(0, 12) + '...';
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            // Compress image to keep database fast
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxWidth = 800;
+                const scale = maxWidth / img.width;
+                canvas.width = img.width > maxWidth ? maxWidth : img.width;
+                canvas.height = img.width > maxWidth ? img.height * scale : img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.75);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    function resetAdminInputs() {
+        document.getElementById('msgInput').value = '';
+        document.getElementById('imgInput').value = '';
+        document.getElementById('fileName').textContent = 'Add Image';
+        document.getElementById('scheduleTime').value = '';
+        selectedImageBase64 = null;
+    }
+
+    // =========================================================================
+    // 5. SEND & SCHEDULE LOGIC
+    // =========================================================================
+    let allMessages = {};
+
+    function saveMessageToDB(msgObj) {
+        if (useFirebase) {
+            push(ref(db, 'channel_messages'), msgObj);
+        } else {
+            const id = 'msg_' + Date.now();
+            allMessages[id] = msgObj;
+            localStorage.setItem('local_channel_msgs', JSON.stringify(allMessages));
+            renderMessages();
+        }
+    }
+
+    window.sendNow = () => {
+        const text = document.getElementById('msgInput').value.trim();
+        if (!text && !selectedImageBase64) return alert("Please enter a message or select an image.");
+
+        const now = Date.now();
+        saveMessageToDB({
+            text: text,
+            image: selectedImageBase64 || null,
+            publishAt: now,
+            likes: 0,
+            hearts: 0
+        });
+        resetAdminInputs();
+    };
+
+    window.scheduleMessage = () => {
+        const text = document.getElementById('msgInput').value.trim();
+        const timeVal = document.getElementById('scheduleTime').value;
+
+        if (!text && !selectedImageBase64) return alert("Please enter a message or select an image.");
+        if (!timeVal) return alert("Please select a Date & Time to schedule.");
+
+        const publishTimestamp = new Date(timeVal).getTime();
+        if (publishTimestamp <= Date.now()) {
+            return alert("Please choose a future date and time.");
+        }
+
+        saveMessageToDB({
+            text: text,
+            image: selectedImageBase64 || null,
+            publishAt: publishTimestamp,
+            likes: 0,
+            hearts: 0
+        });
+        resetAdminInputs();
+        alert("Message scheduled successfully!");
+    };
+
+    window.deleteMessage = (id) => {
+        if (!confirm("Delete this message?")) return;
+        if (useFirebase) {
+            remove(ref(db, 'channel_messages/' + id));
+        } else {
+            delete allMessages[id];
+            localStorage.setItem('local_channel_msgs', JSON.stringify(allMessages));
+            renderMessages();
+        }
+    };
+
+    window.reactMessage = (id, type) => {
+        const reactedKey = `reacted_${id}_${type}`;
+        if (localStorage.getItem(reactedKey)) return;
+        localStorage.setItem(reactedKey, 'true');
+
+        const msg = allMessages[id];
+        if (!msg) return;
+        const newCount = (msg[type] || 0) + 1;
+
+        if (useFirebase) {
+            update(ref(db, 'channel_messages/' + id), { [type]: newCount });
+        } else {
+            allMessages[id][type] = newCount;
+            localStorage.setItem('local_channel_msgs', JSON.stringify(allMessages));
+            renderMessages();
+        }
+    };
+
+    // =========================================================================
+    // 6. REAL-TIME RENDERING & AUTO-SCHEDULER CHECKER
+    // =========================================================================
+    function formatTime(timestamp) {
+        const d = new Date(timestamp);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + d.toLocaleDateString();
+    }
+
+    function linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.replace(urlRegex, url => `<a href="${url}" target="_blank" style="color:#027eb5;text-decoration:underline;">${url}</a>`);
+    }
+
+    function renderMessages() {
+        const chatArea = document.getElementById('chatArea');
+        const scheduledList = document.getElementById('scheduledList');
+        const scheduledContainer = document.getElementById('scheduledContainer');
+        const now = Date.now();
+
+        chatArea.innerHTML = '<div class="date-divider">Channel Updates</div>';
+        scheduledList.innerHTML = '';
+        let hasScheduled = false;
+
+        const sortedIds = Object.keys(allMessages).sort((a, b) => allMessages[a].publishAt - allMessages[b].publishAt);
+
+        sortedIds.forEach(id => {
+            const msg = allMessages[id];
+
+            if (msg.publishAt <= now) {
+                // Published Message (Visible to everyone)
+                const card = document.createElement('div');
+                card.className = 'message-card';
+
+                let imgHTML = msg.image ? `<img src="${msg.image}" class="message-image">` : '';
+                let textHTML = msg.text ? `<div class="message-text">${linkify(msg.text)}</div>` : '';
+                let adminDel = isAdmin ? `<i class="fas fa-trash" onclick="deleteMessage('${id}')" style="color:#d93025;cursor:pointer;margin-left:8px;" title="Delete"></i>` : '';
+
+                card.innerHTML = `
+                    ${imgHTML}
+                    ${textHTML}
+                    <div class="message-footer">
+                        <div class="reactions">
+                            <button class="reaction-btn" onclick="reactMessage('${id}', 'likes')">👍 ${msg.likes || 0}</button>
+                            <button class="reaction-btn" onclick="reactMessage('${id}', 'hearts')">❤️ ${msg.hearts || 0}</button>
+                        </div>
+                        <span class="message-time">${formatTime(msg.publishAt)} ${adminDel}</span>
+                    </div>
+                `;
+                chatArea.appendChild(card);
+            } else if (isAdmin) {
+                // Future Scheduled Message (Visible ONLY to Admin until time arrives)
+                hasScheduled = true;
+                const item = document.createElement('div');
+                item.className = 'scheduled-item';
+                item.innerHTML = `
+                    <span><b>${formatTime(msg.publishAt)}</b>: ${msg.text ? msg.text.substring(0, 22) + '...' : '[Image]'}</span>
+                    <button onclick="deleteMessage('${id}')" style="color:red;border:none;background:none;cursor:pointer;">✖</button>
+                `;
+                scheduledList.appendChild(item);
+            }
+        });
+
+        scheduledContainer.style.display = (isAdmin && hasScheduled) ? 'block' : 'none';
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // Listen to Database
+    if (useFirebase) {
+        onValue(ref(db, 'channel_messages'), (snapshot) => {
+            allMessages = snapshot.val() || {};
+            renderMessages();
+        });
+    } else {
+        allMessages = JSON.parse(localStorage.getItem('local_channel_msgs') || '{}');
+        renderMessages();
+    }
+
+    // Check every 5 seconds if any scheduled message has reached its publish time
+    setInterval(() => {
+        renderMessages();
+    }, 5000);
+</script>
+
+</body>
+</html>

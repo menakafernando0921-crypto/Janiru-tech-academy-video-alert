@@ -1,0 +1,301 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Helpers
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'menakafernando0921@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints
+    // -------------------------------------------------------------------------
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'publishAt', 'createdAt', 'updatedAt', 'authorId', 'likesCount', 'heartsCount'])
+        && data.keys().hasOnly(['text', 'imageData', 'publishAt', 'createdAt', 'updatedAt', 'authorId', 'likesCount', 'heartsCount'])
+        && data.text is string
+        && data.text.size() <= 4000
+        && (!('imageData' in data) || data.imageData == null || (data.imageData is string && data.imageData.size() <= 450000))
+        && (data.text.size() > 0 || ('imageData' in data && data.imageData is string && data.imageData.size() > 0))
+        && data.publishAt is number
+        && data.publishAt > 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.authorId is string
+        && data.authorId.size() >= 1
+        && data.authorId.size() <= 128
+        && data.likesCount is int
+        && data.likesCount >= 0
+        && data.heartsCount is int
+        && data.heartsCount >= 0;
+    }
+
+    function isValidReaction(data, messageId, reactionId) {
+      return data.keys().hasAll(['userId', 'type', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'type', 'createdAt'])
+        && data.userId is string
+        && data.userId == request.auth.uid
+        && data.type in ['likes', 'hearts']
+        && reactionId == (request.auth.uid + '_' + data.type)
+        && data.createdAt == request.time
+        && exists(/databases/$(database)/documents/messages/$(messageId));
+    }
+
+    function isValidChannelMeta(data) {
+      return data.keys().hasAll(['name', 'subtitle', 'baseFollowers', 'followersCount', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'subtitle', 'baseFollowers', 'followersCount', 'updatedAt'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.subtitle is string && data.subtitle.size() >= 1 && data.subtitle.size() <= 100
+        && data.baseFollowers is int && data.baseFollowers >= 0
+        && data.followersCount is int && data.followersCount >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFollower(data, userId) {
+      return data.keys().hasAll(['userId', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'createdAt'])
+        && data.userId is string
+        && data.userId == request.auth.uid
+        && userId == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
+    function isValidAdminDoc(data) {
+      return data.keys().hasAll(['email', 'createdAt'])
+        && data.keys().hasOnly(['email', 'createdAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.createdAt == request.time;
+    }
+
+    // -------------------------------------------------------------------------
+    // /test/connection (Startup Connectivity Sentinel)
+    // -------------------------------------------------------------------------
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // /admins/{userId}
+    // -------------------------------------------------------------------------
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isBootstrappedAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create: if isBootstrappedAdmin() && isValidId(userId) && isValidAdminDoc(incoming());
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(userId);
+    }
+
+    // -------------------------------------------------------------------------
+    // /channel/meta & /channel/meta/followers/{userId}
+    // -------------------------------------------------------------------------
+    match /channel/meta {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidChannelMeta(incoming())
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isVerifiedUser()
+            && incoming().name == 'Janiru tech academy'
+            && incoming().subtitle == 'Video Alerts'
+            && incoming().baseFollowers == 1240
+            && incoming().followersCount == 1
+            && existsAfter(/databases/$(database)/documents/channel/meta/followers/$(request.auth.uid))
+          )
+        );
+      allow update: if isValidChannelMeta(incoming())
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isVerifiedUser()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'updatedAt'])
+            && (
+              (
+                incoming().followersCount == existing().followersCount + 1
+                && !exists(/databases/$(database)/documents/channel/meta/followers/$(request.auth.uid))
+                && existsAfter(/databases/$(database)/documents/channel/meta/followers/$(request.auth.uid))
+              )
+              || (
+                incoming().followersCount == existing().followersCount - 1
+                && exists(/databases/$(database)/documents/channel/meta/followers/$(request.auth.uid))
+                && !existsAfter(/databases/$(database)/documents/channel/meta/followers/$(request.auth.uid))
+              )
+            )
+          )
+        );
+      allow delete: if false;
+
+      match /followers/{userId} {
+        allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+        allow list: if isBootstrappedAdmin();
+        allow create: if isVerifiedUser()
+          && isValidId(userId)
+          && isValidFollower(incoming(), userId)
+          && existsAfter(/databases/$(database)/documents/channel/meta)
+          && (
+            (
+              !exists(/databases/$(database)/documents/channel/meta)
+              && getAfter(/databases/$(database)/documents/channel/meta).data.followersCount == 1
+            )
+            || (
+              exists(/databases/$(database)/documents/channel/meta)
+              && getAfter(/databases/$(database)/documents/channel/meta).data.followersCount == get(/databases/$(database)/documents/channel/meta).data.followersCount + 1
+            )
+          );
+        allow update: if false;
+        allow delete: if isVerifiedUser()
+          && isValidId(userId)
+          && request.auth.uid == userId
+          && getAfter(/databases/$(database)/documents/channel/meta).data.followersCount == get(/databases/$(database)/documents/channel/meta).data.followersCount - 1;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // /messages/{messageId} & /messages/{messageId}/reactions/{reactionId}
+    // -------------------------------------------------------------------------
+    match /messages/{messageId} {
+      allow get: if isValidId(messageId) && (existing().publishAt <= request.time.toMillis() || isAdmin());
+      // No get()/exists() in allow list (Pillar 8 Cost-Optimization Clause)
+      allow list: if existing().publishAt <= request.time.toMillis() || isBootstrappedAdmin();
+
+      allow create: if isAdmin()
+        && isValidId(messageId)
+        && isValidMessage(incoming())
+        && incoming().authorId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().likesCount == 0
+        && incoming().heartsCount == 0;
+
+      allow update: if isValidId(messageId)
+        && isValidMessage(incoming())
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'imageData', 'publishAt', 'updatedAt'])
+          )
+          || (
+            isVerifiedUser()
+            && existing().publishAt <= request.time.toMillis()
+            && (
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt'])
+                && (
+                  (
+                    incoming().likesCount == existing().likesCount + 1
+                    && !exists(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_likes'))
+                    && existsAfter(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_likes'))
+                  )
+                  || (
+                    incoming().likesCount == existing().likesCount - 1
+                    && exists(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_likes'))
+                    && !existsAfter(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_likes'))
+                  )
+                )
+              )
+              || (
+                incoming().diff(existing()).affectedKeys().hasOnly(['heartsCount', 'updatedAt'])
+                && (
+                  (
+                    incoming().heartsCount == existing().heartsCount + 1
+                    && !exists(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_hearts'))
+                    && existsAfter(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_hearts'))
+                  )
+                  || (
+                    incoming().heartsCount == existing().heartsCount - 1
+                    && exists(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_hearts'))
+                    && !existsAfter(/databases/$(database)/documents/messages/$(messageId)/reactions/$(request.auth.uid + '_hearts'))
+                  )
+                )
+              )
+            )
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(messageId);
+
+      match /reactions/{reactionId} {
+        allow get: if isSignedIn()
+          && isValidId(messageId)
+          && isValidId(reactionId)
+          && (
+            reactionId == (request.auth.uid + '_likes')
+            || reactionId == (request.auth.uid + '_hearts')
+          );
+        allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+        allow create: if isVerifiedUser()
+          && isValidId(messageId)
+          && isValidId(reactionId)
+          && isValidReaction(incoming(), messageId, reactionId)
+          && get(/databases/$(database)/documents/messages/$(messageId)).data.publishAt <= request.time.toMillis()
+          && (
+            (
+              incoming().type == 'likes'
+              && getAfter(/databases/$(database)/documents/messages/$(messageId)).data.likesCount == get(/databases/$(database)/documents/messages/$(messageId)).data.likesCount + 1
+            )
+            || (
+              incoming().type == 'hearts'
+              && getAfter(/databases/$(database)/documents/messages/$(messageId)).data.heartsCount == get(/databases/$(database)/documents/messages/$(messageId)).data.heartsCount + 1
+            )
+          );
+
+        allow update: if false;
+
+        allow delete: if isVerifiedUser()
+          && isValidId(messageId)
+          && isValidId(reactionId)
+          && existing().userId == request.auth.uid
+          && (
+            (
+              existing().type == 'likes'
+              && getAfter(/databases/$(database)/documents/messages/$(messageId)).data.likesCount == get(/databases/$(database)/documents/messages/$(messageId)).data.likesCount - 1
+            )
+            || (
+              existing().type == 'hearts'
+              && getAfter(/databases/$(database)/documents/messages/$(messageId)).data.heartsCount == get(/databases/$(database)/documents/messages/$(messageId)).data.heartsCount - 1
+            )
+          );
+      }
+    }
+  }
+}
